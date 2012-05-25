@@ -306,37 +306,27 @@ void OGRIngresTableLayer::BuildWhere()
 {
     osWHERE = "";
 
-#ifdef notdef
-    if( m_poFilterGeom != NULL && pszGeomColumn )
-    {
-        char szEnvelope[4096];
-        OGREnvelope  sEnvelope;
-        szEnvelope[0] = '\0';
-        
-        //POLYGON((MINX MINY, MAXX MINY, MAXX MAXY, MINX MAXY, MINX MINY))
-        m_poFilterGeom->getEnvelope( &sEnvelope );
-        
-        sprintf(szEnvelope,
-                "POLYGON((%.12f %.12f, %.12f %.12f, %.12f %.12f, %.12f %.12f, %.12f %.12f))",
-                sEnvelope.MinX, sEnvelope.MinY,
-                sEnvelope.MaxX, sEnvelope.MinY,
-                sEnvelope.MaxX, sEnvelope.MaxY,
-                sEnvelope.MinX, sEnvelope.MaxY,
-                sEnvelope.MinX, sEnvelope.MinY);
-
-        osWHERE.Printf( "WHERE MBRIntersects(GeomFromText('%s'), %s)",
-                        szEnvelope,
-                        osGeomColumn.c_str() );
-
+    /* -------------------------------------------------------------------- */
+    /* 				Spatial Filter											*/
+    /* -------------------------------------------------------------------- */
+    /* Currently use *Intersects* funtion for filtering the geometry. For a */
+    /* performace consideration, It is perferable to use *MBRIntersect*     */
+    if( m_poFilterGeom != NULL && osGeomColumn.size())
+    { 
+        osWHERE.Printf( "WHERE INTERSECTS(%s, GEOMETRYFROMWKB( ~V , %d)) = 1",
+                        osGeomColumn.c_str(),
+                        nSRSId);
     }
-#endif
 
+    /* -------------------------------------------------------------------- */
+    /*              Attribute Filter										*/
+    /* -------------------------------------------------------------------- */
     if( osQuery.size() > 0 )
     {
         if( osWHERE.size() == 0 )
             osWHERE = "WHERE " + osQuery;
         else
-            osWHERE += "&& " + osQuery;
+            osWHERE += " AND " + osQuery;
     }
 }
 
@@ -1282,54 +1272,69 @@ OGRFeature *OGRIngresTableLayer::GetFeature( long nFeatureId )
 /*      Eventually we should consider implementing a more efficient     */
 /*      way of counting features matching a spatial query.              */
 /************************************************************************/
-
-#ifdef notdef
 int OGRIngresTableLayer::GetFeatureCount( int bForce )
 
 {
-/* -------------------------------------------------------------------- */
-/*      Ensure any active long result is interrupted.                   */
-/* -------------------------------------------------------------------- */
-    poDS->InterruptLongResult();
-    
-/* -------------------------------------------------------------------- */
-/*      Issue the appropriate select command.                           */
-/* -------------------------------------------------------------------- */
-    INGRES_RES    *hResult;
-    const char         *pszCommand;
+    CPLString osSqlCmd;
+    OGRIngresStatement oStmt( poDS->GetConn() );
+    int nCount = 0 ;
 
-    pszCommand = CPLSPrintf( "SELECT COUNT(*) FROM %s %s", 
-                             poFeatureDefn->GetName(), pszWHERE );
-
-    if( ingres_query( poDS->GetConn(), pszCommand ) )
+    poDS->EstablishActiveLayer( this );
+    /* -------------------------------------------------------------------- */
+    /* 	If attribute filter or spatial filter is set, a query must be used  */
+    /* -------------------------------------------------------------------- */
+    if (osWHERE.size())
     {
-        poDS->ReportError( pszCommand );
-        return FALSE;
+        osSqlCmd.Printf("SELECT INT4(COUNT(*)) FROM %s %s",
+            poFeatureDefn->GetName(), osWHERE);
+
+        /* Bind Geometry */
+        if (m_poFilterGeom)
+        {        
+            GByte * pabyWKB = NULL;
+            int nSize = m_poFilterGeom->WkbSize();
+            pabyWKB = (GByte *) CPLMalloc(nSize);
+
+            m_poFilterGeom->exportToWkb(wkbNDR, pabyWKB);
+
+            oStmt.addInputParameter( IIAPI_LBYTE_TYPE, nSize, pabyWKB );
+            CPLFree(pabyWKB);
+        }
+    }
+    else
+    {
+        /* -------------------------------------------------------------------- */
+        /* 	Force means use select count(*) method 								*/
+        /* -------------------------------------------------------------------- */
+        if (bForce)
+        {
+            osSqlCmd.Printf("SELECT INT4(COUNT(*)) FROM %s",
+                poFeatureDefn->GetName());
+        }
+        else
+        {
+            osSqlCmd.Printf("SELECT INT4(num_rows) FROM iitables "
+                "WHERE TABLE_NAME=LOWERCASE('%s') AND "
+                "TABLE_OWNER=(SELECT DBMSINFO('username'))");
+        }        
     }
 
-    hResult = ingres_store_result( poDS->GetConn() );
-    if( hResult == NULL )
+    /* -------------------------------------------------------------------- */
+    /*  Execute SQL and get the result  									*/
+    /* -------------------------------------------------------------------- */
+    if (!oStmt.ExecuteSQL(osSqlCmd.c_str()))
     {
-        poDS->ReportError( "ingres_store_result() failed on SELECT COUNT(*)." );
-        return FALSE;
+        /* Failed */
+        return 0;
     }
-    
-/* -------------------------------------------------------------------- */
-/*      Capture the result.                                             */
-/* -------------------------------------------------------------------- */
-    char **papszRow = ingres_fetch_row( hResult );
-    int nCount = 0;
 
-    if( papszRow != NULL && papszRow[0] != NULL )
-        nCount = atoi(papszRow[0]);
+    char **papszRow = oStmt.GetRow();
+    CPLAssert(papszRow);
 
-    if( hResultSet != NULL )
-        ingres_free_result( hResultSet );
- 		hResultSet = NULL;
+    memcpy(&nCount ,papszRow[0], 4);
     
     return nCount;
 }
-#endif
 
 /************************************************************************/
 /*                          GetExtent()					*/

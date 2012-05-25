@@ -649,6 +649,21 @@ OGRFeature *OGRIngresLayer::GetNextRawFeature()
 
         poResultSet = new OGRIngresStatement( poDS->GetConn() );
 
+        /* -------------------------------------------------------------------- */
+        /*              Binding Filter Geometry 								*/
+        /* -------------------------------------------------------------------- */
+        if (m_poFilterGeom)
+        {        
+            GByte * pabyWKB = NULL;
+            int nSize = m_poFilterGeom->WkbSize();
+            pabyWKB = (GByte *) CPLMalloc(nSize);
+
+            m_poFilterGeom->exportToWkb(wkbNDR, pabyWKB);
+
+            poResultSet->addInputParameter( IIAPI_LBYTE_TYPE, nSize, pabyWKB );
+            CPLFree(pabyWKB);
+        }
+
         if( !poResultSet->ExecuteSQL( osQueryStatement ) )
             return NULL;
     }
