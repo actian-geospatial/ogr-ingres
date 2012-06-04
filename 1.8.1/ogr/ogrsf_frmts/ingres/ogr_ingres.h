@@ -164,7 +164,7 @@ class OGRIngresTableLayer : public OGRIngresLayer
 
     OGRErr              Initialize(const char* pszTableName);
     
-//    virtual OGRFeature *GetFeature( long nFeatureId );
+    virtual OGRFeature *GetFeature( long nFeatureId );
     virtual void        ResetReading();
     virtual int         GetFeatureCount( int );
 
@@ -185,7 +185,7 @@ class OGRIngresTableLayer : public OGRIngresLayer
                                 { bPreservePrecision = bFlag; }    
 
     virtual int         TestCapability( const char * );
-//    virtual OGRErr      GetExtent(OGREnvelope *psExtent, int bForce = TRUE);
+    virtual OGRErr      GetExtent(OGREnvelope *psExtent, int bForce = TRUE);
 };
 
 /************************************************************************/

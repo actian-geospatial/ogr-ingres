@@ -1190,11 +1190,10 @@ OGRErr OGRIngresTableLayer::CreateField( OGRFieldDefn *poFieldIn,
 /************************************************************************/
 /*                             GetFeature()                             */
 /************************************************************************/
-#ifdef notdef
 OGRFeature *OGRIngresTableLayer::GetFeature( long nFeatureId )
 
 {
-    if( pszFIDColumn == NULL )
+    if( osFIDColumn.size() == 0 )
         return OGRIngresLayer::GetFeature( nFeatureId );
 
 /* -------------------------------------------------------------------- */
@@ -1207,62 +1206,46 @@ OGRFeature *OGRIngresTableLayer::GetFeature( long nFeatureId )
 /*      interest.                                                       */
 /* -------------------------------------------------------------------- */
     char        *pszFieldList = BuildFields();
-    char        *pszCommand = (char *) CPLMalloc(strlen(pszFieldList)+2000);
+    CPLString   osSqlCmd;
+    OGRIngresStatement oStmt(poDS->GetConn());
 
-    sprintf( pszCommand, 
-             "SELECT %s FROM %s WHERE %s = %ld", 
-             pszFieldList, poFeatureDefn->GetName(), pszFIDColumn, 
-             nFeatureId );
+    CPLAssert(pszFieldList);
+    osSqlCmd.Printf("SELECT %s FROM %s WHERE %s = %ld",
+        pszFieldList,
+        poFeatureDefn->GetName(),
+        osFIDColumn,
+        nFeatureId);
     CPLFree( pszFieldList );
 
 /* -------------------------------------------------------------------- */
 /*      Issue the command.                                              */
 /* -------------------------------------------------------------------- */
-    if( ingres_query( poDS->GetConn(), pszCommand ) )
+    CPLDebug("Ingres", osSqlCmd.c_str());
+    if (!oStmt.ExecuteSQL(osSqlCmd.c_str()))
     {
-        poDS->ReportError( pszCommand );
-        return NULL;
-    }
-    CPLFree( pszCommand );
-
-    hResultSet = ingres_store_result( poDS->GetConn() );
-    if( hResultSet == NULL )
-    {
-        poDS->ReportError( "ingres_store_result() failed on query." );
         return NULL;
     }
 
 /* -------------------------------------------------------------------- */
 /*      Fetch the result record.                                        */
 /* -------------------------------------------------------------------- */
-    char **papszRow;
-    unsigned long *panLengths;
-
-    papszRow = ingres_fetch_row( hResultSet );
-    if( papszRow == NULL )
+    char **papszRow = oStmt.GetRow();
+    if (!papszRow)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined,
+            "Can't get the result row which may be caused by query "
+            "error or result row of id %d is not exist."
+            , nFeatureId);
         return NULL;
-
-    panLengths = ingres_fetch_lengths( hResultSet );
+    }
 
 /* -------------------------------------------------------------------- */
 /*      Transform into a feature.                                       */
 /* -------------------------------------------------------------------- */
-    iNextShapeId = nFeatureId;
-
-    OGRFeature *poFeature = RecordToFeature( papszRow, panLengths );
-
-    iNextShapeId = 0;
-
-/* -------------------------------------------------------------------- */
-/*      Cleanup                                                         */
-/* -------------------------------------------------------------------- */
-    if( hResultSet != NULL )
-        ingres_free_result( hResultSet );
- 		hResultSet = NULL;
+    OGRFeature *poFeature = RecordToFeature( papszRow);
 
     return poFeature;
 }
-#endif
 
 /************************************************************************/
 /*                          GetFeatureCount()                           */
@@ -1319,6 +1302,7 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
         }        
     }
 
+    CPLDebug("Ingres", osSqlCmd.c_str());
     /* -------------------------------------------------------------------- */
     /*  Execute SQL and get the result  									*/
     /* -------------------------------------------------------------------- */
@@ -1343,7 +1327,7 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
 /*      in the future when Ingres adds support for a single MBR query    */
 /*      like PostgreSQL.						*/
 /************************************************************************/
-#ifdef notdef
+
 OGRErr OGRIngresTableLayer::GetExtent(OGREnvelope *psExtent, int bForce )
 
 {
@@ -1354,72 +1338,67 @@ OGRErr OGRIngresTableLayer::GetExtent(OGREnvelope *psExtent, int bForce )
         psExtent->MinY = 0.0;
         psExtent->MaxY = 0.0;
         
+        CPLError(CE_Failure, CPLE_AppDefined, 
+            "%s is not a geometry layer", GetLayerDefn()->GetName());
         return OGRERR_FAILURE;
     }
 
 	OGREnvelope oEnv;
 	CPLString   osCommand;
 	GBool       bExtentSet = FALSE;
+    OGRIngresStatement oStmt(poDS->GetConn()); 
 
-	osCommand.Printf( "SELECT Envelope(%s) FROM %s;", pszGeomColumn, pszGeomColumnTable);
+	osCommand.Printf( "SELECT Extent(%s) FROM %s;", 
+        osGeomColumn, 
+        GetLayerDefn()->GetName());
+    CPLDebug("Ingres", osCommand.c_str());
 
-	if (ingres_query(poDS->GetConn(), osCommand) == 0)
-	{
-		INGRES_RES* result = ingres_use_result(poDS->GetConn());
-		if ( result == NULL )
+    /* -------------------------------------------------------------------- */
+    /*  Execute SQL and get the result  									*/
+    /* -------------------------------------------------------------------- */
+    if (!oStmt.ExecuteSQL(osCommand.c_str()))
+    {
+        /* Failed */
+        return OGRERR_FAILURE;
+    }
+
+    char **papszRow = oStmt.GetRow();
+    if (papszRow == NULL)
+    {
+        return OGRERR_FAILURE;
+    }
+
+    /* -------------------------------------------------------------------- */
+    /* 	What kind of result it is?											*/
+    /* -------------------------------------------------------------------- */
+    OGRGeometry *poGeometry = NULL;
+    OGRGeometryFactory::createFromWkb( (GByte*)papszRow[0], 
+        NULL,
+        &poGeometry,
+        -1);
+
+    if ( poGeometry != NULL )
+    {
+        if (poGeometry && !bExtentSet)
         {
-            poDS->ReportError( "ingres_use_result() failed on extents query." );
-            return OGRERR_FAILURE;
+            poGeometry->getEnvelope(psExtent);
+            bExtentSet = TRUE;
         }
-
-		INGRES_ROW row; 
-		unsigned long *panLengths = NULL;
-		while ((row = ingres_fetch_row(result)))
-		{
-			if (panLengths == NULL)
-			{
-				panLengths = ingres_fetch_lengths( result );
-				if ( panLengths == NULL )
-				{
-					poDS->ReportError( "ingres_fetch_lengths() failed on extents query." );
-					return OGRERR_FAILURE;
-				}
-			}
-
-			OGRGeometry *poGeometry = NULL;
-			// Geometry columns will have the first 4 bytes contain the SRID.
-			OGRGeometryFactory::createFromWkb(((GByte *)row[0]) + 4, 
-											  NULL,
-											  &poGeometry,
-											  panLengths[0] - 4 );
-
-			if ( poGeometry != NULL )
-			{
-				if (poGeometry && !bExtentSet)
-				{
-					poGeometry->getEnvelope(psExtent);
-					bExtentSet = TRUE;
-				}
-				else if (poGeometry)
-				{
-					poGeometry->getEnvelope(&oEnv);
-					if (oEnv.MinX < psExtent->MinX) 
-						psExtent->MinX = oEnv.MinX;
-					if (oEnv.MinY < psExtent->MinY) 
-						psExtent->MinY = oEnv.MinY;
-					if (oEnv.MaxX > psExtent->MaxX) 
-						psExtent->MaxX = oEnv.MaxX;
-					if (oEnv.MaxY > psExtent->MaxY) 
-						psExtent->MaxY = oEnv.MaxY;
-				}
-				delete poGeometry;
-			}
-		}
-
-		ingres_free_result(result);      
-	}
+        else if (poGeometry)
+        {
+            poGeometry->getEnvelope(&oEnv);
+            if (oEnv.MinX < psExtent->MinX) 
+                psExtent->MinX = oEnv.MinX;
+            if (oEnv.MinY < psExtent->MinY) 
+                psExtent->MinY = oEnv.MinY;
+            if (oEnv.MaxX > psExtent->MaxX) 
+                psExtent->MaxX = oEnv.MaxX;
+            if (oEnv.MaxY > psExtent->MaxY) 
+                psExtent->MaxY = oEnv.MaxY;
+        }
+        delete poGeometry;
+    }
 
 	return (bExtentSet ? OGRERR_NONE : OGRERR_FAILURE);
 }
-#endif
 
