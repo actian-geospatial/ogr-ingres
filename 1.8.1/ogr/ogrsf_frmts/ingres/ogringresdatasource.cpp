@@ -228,11 +228,24 @@ int OGRIngresDataSource::Open( const char *pszFullName,
     IIapi_initialize( &initParm );
 
 /* -------------------------------------------------------------------- */
-/*      check effective user and db password                            */
+/* check effective user and db password                                 */
+/* if effective user and db password is not passed, use name/password   */ 
+/* instead.                                                             */
 /* -------------------------------------------------------------------- */
     hConn = NULL;
-    const char *pszEffuser = CSLFetchNameValue(papszOptions,"effuser");
+    const char *pszEffuser = CSLFetchNameValue(papszOptions,"effuser") ;
     const char *pszDBpwd = CSLFetchNameValue(papszOptions,"dbpwd");
+
+    if (pszEffuser == NULL)
+    {
+        pszEffuser = CSLFetchNameValue(papszOptions,"username");
+    }
+    
+    if (pszDBpwd == NULL)
+    {
+        pszDBpwd = CSLFetchNameValue(papszOptions,"password");
+    }
+    
     if ( pszEffuser 
         && strlen(pszEffuser) > 0 
         && pszDBpwd 
