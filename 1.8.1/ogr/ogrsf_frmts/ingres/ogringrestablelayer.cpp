@@ -1213,7 +1213,7 @@ OGRFeature *OGRIngresTableLayer::GetFeature( long nFeatureId )
     osSqlCmd.Printf("SELECT %s FROM %s WHERE %s = %ld",
         pszFieldList,
         poFeatureDefn->GetName(),
-        osFIDColumn,
+        osFIDColumn.c_str(),
         nFeatureId);
     CPLFree( pszFieldList );
 
@@ -1242,7 +1242,9 @@ OGRFeature *OGRIngresTableLayer::GetFeature( long nFeatureId )
 /* -------------------------------------------------------------------- */
 /*      Transform into a feature.                                       */
 /* -------------------------------------------------------------------- */
+    poResultSet = &oStmt;
     OGRFeature *poFeature = RecordToFeature( papszRow);
+    poResultSet = NULL;
 
     return poFeature;
 }
@@ -1269,7 +1271,7 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
     if (osWHERE.size())
     {
         osSqlCmd.Printf("SELECT INT4(COUNT(*)) FROM %s %s",
-            poFeatureDefn->GetName(), osWHERE);
+            poFeatureDefn->GetName(), osWHERE.c_str());
 
         /* Bind Geometry */
         if (m_poFilterGeom)
@@ -1348,8 +1350,8 @@ OGRErr OGRIngresTableLayer::GetExtent(OGREnvelope *psExtent, int bForce )
 	GBool       bExtentSet = FALSE;
     OGRIngresStatement oStmt(poDS->GetConn()); 
 
-	osCommand.Printf( "SELECT Extent(%s) FROM %s;", 
-        osGeomColumn, 
+	osCommand.Printf( "SELECT asbinary(extent(%s)) FROM %s", 
+        osGeomColumn.c_str(), 
         GetLayerDefn()->GetName());
     CPLDebug("Ingres", osCommand.c_str());
 

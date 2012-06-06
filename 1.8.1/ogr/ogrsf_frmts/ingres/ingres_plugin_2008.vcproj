@@ -42,13 +42,13 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="&quot;$(II_SYSTEM)\ingres\files&quot;;&quot;$(SolutionDir)..\..\..\gcore&quot;;&quot;$(SolutionDir)..\..\..\port&quot;;&quot;$(SolutionDir)..\..\..\ogr&quot;;&quot;$(SolutionDir)..\..\..\ogr\ogrsf_frmts&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;INGRES_PLUGIN_2008_EXPORTS"
+				PreprocessorDefinitions="WIN32;DEBUG;WINDOWS;_USRDLL;INGRES_PLUGIN_2008_EXPORTS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="3"
+				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
-				WarningLevel="3"
-				DebugInformationFormat="4"
+				WarningLevel="4"
+				DebugInformationFormat="3"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -141,7 +141,7 @@
 				OutputFile="$(OutDir)\ogr_Ingres.dll"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;$(II_SYSTEM)\ingres\lib&quot;;&quot;$(SolutionDir)..\..\..\&quot;"
-				GenerateDebugInformation="false"
+				GenerateDebugInformation="true"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -180,6 +180,10 @@
 			>
 			<File
 				RelativePath=".\ogringresdatasource.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ogringresdriver.cpp"
 				>
 			</File>
 			<File
