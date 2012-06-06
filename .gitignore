@@ -164,3 +164,20 @@ pip-log.txt
 
 # Mac crap
 .DS_Store
+
+1.8.1/apps/gdal_contour.exp
+1.8.1/apps/gdal_grid.exp
+1.8.1/apps/gdal_rasterize.exp
+1.8.1/apps/gdal_translate.exp
+1.8.1/apps/gdaladdo.exp
+1.8.1/apps/gdalbuildvrt.exp
+1.8.1/apps/gdaldem.exp
+1.8.1/apps/gdalenhance.exp
+1.8.1/apps/gdallocationinfo.exp
+1.8.1/apps/gdalmanage.exp
+1.8.1/apps/gdaltransform.exp
+1.8.1/apps/gdalwarp.exp
+1.8.1/apps/nearblack.exp
+1.8.1/apps/ogr2ogr.exp
+1.8.1/apps/ogrinfo.exp
+1.8.1/apps/ogrtindex.exp
