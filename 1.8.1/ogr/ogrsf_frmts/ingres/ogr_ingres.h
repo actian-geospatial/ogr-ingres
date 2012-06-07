@@ -79,6 +79,24 @@ public:
 };
 
 /************************************************************************/
+/*                      OGRIngresSelectStmt                             */
+/************************************************************************/
+class OGRIngresSelectStmt
+{
+public:
+    char        **papszFieldList;
+    CPLString   osFromList;
+    CPLString   osWhereClause;
+
+    OGRIngresSelectStmt() { papszFieldList = NULL;}
+    ~OGRIngresSelectStmt() 
+    { 
+        if (papszFieldList)
+            CSLDestroy(papszFieldList);
+    }
+};
+
+/************************************************************************/
 /*                            OGRIngresLayer                             */
 /************************************************************************/
 
@@ -103,11 +121,15 @@ class OGRIngresLayer : public OGRLayer
     CPLString           osIngresGeomType;
 
     CPLString           osFIDColumn;
+    CPLString           osQuery;
+    CPLString           osWHERE;
 
     OGRIngresStatement *poResultSet; /* stmt */
 
     int                 FetchSRSId(OGRFeatureDefn *poDefn);
     OGRGeometry        *TranslateGeometry( const char * );
+    void                BuildWhere(void);
+    void                BindQueryGeometry(OGRIngresStatement* poStatement);
 
   public:
                         OGRIngresLayer();
@@ -131,6 +153,9 @@ class OGRIngresLayer : public OGRLayer
     /* custom methods */
     virtual OGRFeature *RecordToFeature( char **papszRow );
     virtual OGRFeature *GetNextRawFeature();
+
+    virtual void        SetSpatialFilter( OGRGeometry * );
+    virtual OGRErr      SetAttributeFilter( const char * );
 };
 
 /************************************************************************/
@@ -143,12 +168,8 @@ class OGRIngresTableLayer : public OGRIngresLayer
 
     OGRFeatureDefn     *ReadTableDefinition(const char *);
 
-    void                BuildWhere(void);
     char               *BuildFields(void);
     void                BuildFullQueryStatement(void);
-
-    CPLString           osQuery;
-    CPLString           osWHERE;
 
     int                 bLaunderColumnNames;
     int                 bPreservePrecision;
@@ -167,10 +188,6 @@ class OGRIngresTableLayer : public OGRIngresLayer
     virtual OGRFeature *GetFeature( long nFeatureId );
     virtual void        ResetReading();
     virtual int         GetFeatureCount( int );
-
-    void                SetSpatialFilter( OGRGeometry * );
-
-    virtual OGRErr      SetAttributeFilter( const char * );
 
     virtual OGRErr      CreateFeature( OGRFeature *poFeature );
     virtual OGRErr      DeleteFeature( long nFID );
@@ -195,6 +212,9 @@ class OGRIngresTableLayer : public OGRIngresLayer
 class OGRIngresResultLayer : public OGRIngresLayer
 {
     void                BuildFullQueryStatement(void);
+    OGRErr              ReparseQueryStatement();
+    OGRErr              ParseSQLStmt(OGRIngresSelectStmt& oSelectStmt,
+        const char* pszRawSQL);
 
     char                *pszRawStatement;
     

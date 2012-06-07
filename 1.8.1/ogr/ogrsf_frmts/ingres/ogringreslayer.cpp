@@ -77,6 +77,85 @@ OGRIngresLayer::~OGRIngresLayer()
 }
 
 /************************************************************************/
+/*                          SetSpatialFilter()                          */
+/************************************************************************/
+
+void OGRIngresLayer::SetSpatialFilter( OGRGeometry * poGeomIn )
+
+{
+    if( !InstallFilter( poGeomIn ) )
+        return;
+
+    BuildWhere();
+
+    ResetReading();
+}
+
+/************************************************************************/
+/*                             BuildWhere()                             */
+/*                                                                      */
+/*      Build the WHERE statement appropriate to the current set of     */
+/*      criteria (spatial and attribute queries).                       */
+/************************************************************************/
+
+void OGRIngresLayer::BuildWhere()
+
+{
+    osWHERE = "";
+
+    /* -------------------------------------------------------------------- */
+    /* 				Spatial Filter											*/
+    /* -------------------------------------------------------------------- */
+    /* Currently use *Intersects* funtion for filtering the geometry. For a */
+    /* performace consideration, It is perferable to use *MBRIntersect*     */
+    if( m_poFilterGeom != NULL && osGeomColumn.size())
+    { 
+        if (nSRSId > 0)
+        {       
+            osWHERE.Printf( "INTERSECTS(%s, GEOMETRYFROMWKB( ~V , %d)) = 1",
+                osGeomColumn.c_str(),
+                nSRSId);
+        }
+        else
+        {        
+            osWHERE.Printf( "INTERSECTS(%s, GEOMETRYFROMWKB( ~V , SRID(%s))) = 1",
+                osGeomColumn.c_str(),
+                osGeomColumn.c_str());
+        }
+    }
+
+    /* -------------------------------------------------------------------- */
+    /*              Attribute Filter										*/
+    /* -------------------------------------------------------------------- */
+    if( osQuery.size() > 0 )
+    {
+        if( osWHERE.size() == 0 )
+            osWHERE = osQuery;
+        else
+            osWHERE += " AND " + osQuery;
+    }
+}
+
+/************************************************************************/
+/*                         SetAttributeFilter()                         */
+/************************************************************************/
+
+OGRErr OGRIngresLayer::SetAttributeFilter( const char *pszQuery )
+
+{
+    osQuery = "";
+
+    if( pszQuery != NULL )
+        osQuery = pszQuery;
+
+    BuildWhere();
+
+    ResetReading();
+
+    return OGRERR_NONE;
+}
+
+/************************************************************************/
 /*                            ResetReading()                            */
 /************************************************************************/
 
@@ -90,6 +169,27 @@ void OGRIngresLayer::ResetReading()
         delete poResultSet;
         poResultSet = NULL;
     }
+}
+
+/************************************************************************/
+/*                    BindQueryGeometry                                 */
+/************************************************************************/
+
+void  OGRIngresLayer::BindQueryGeometry(OGRIngresStatement *poStatement)
+{
+    if (poStatement == NULL)
+    {
+        return;
+    }
+    
+    GByte * pabyWKB = NULL;
+    int nSize = m_poFilterGeom->WkbSize();
+    pabyWKB = (GByte *) CPLMalloc(nSize);
+
+    m_poFilterGeom->exportToWkb(wkbNDR, pabyWKB);
+
+    poStatement->addInputParameter( IIAPI_LBYTE_TYPE, nSize, pabyWKB );
+    CPLFree(pabyWKB);
 }
 
 /************************************************************************/
@@ -654,14 +754,7 @@ OGRFeature *OGRIngresLayer::GetNextRawFeature()
         /* -------------------------------------------------------------------- */
         if (m_poFilterGeom)
         {        
-            GByte * pabyWKB = NULL;
-            int nSize = m_poFilterGeom->WkbSize();
-            pabyWKB = (GByte *) CPLMalloc(nSize);
-
-            m_poFilterGeom->exportToWkb(wkbNDR, pabyWKB);
-
-            poResultSet->addInputParameter( IIAPI_LBYTE_TYPE, nSize, pabyWKB );
-            CPLFree(pabyWKB);
+            BindQueryGeometry(poResultSet);
         }
 
         if( !poResultSet->ExecuteSQL( osQueryStatement ) )

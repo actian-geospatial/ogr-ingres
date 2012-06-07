@@ -280,57 +280,6 @@ OGRFeatureDefn *OGRIngresTableLayer::ReadTableDefinition( const char *pszTable )
 }
 
 /************************************************************************/
-/*                          SetSpatialFilter()                          */
-/************************************************************************/
-
-void OGRIngresTableLayer::SetSpatialFilter( OGRGeometry * poGeomIn )
-
-{
-    if( !InstallFilter( poGeomIn ) )
-        return;
-
-    BuildWhere();
-
-    ResetReading();
-}
-
-/************************************************************************/
-/*                             BuildWhere()                             */
-/*                                                                      */
-/*      Build the WHERE statement appropriate to the current set of     */
-/*      criteria (spatial and attribute queries).                       */
-/************************************************************************/
-
-void OGRIngresTableLayer::BuildWhere()
-
-{
-    osWHERE = "";
-
-    /* -------------------------------------------------------------------- */
-    /* 				Spatial Filter											*/
-    /* -------------------------------------------------------------------- */
-    /* Currently use *Intersects* funtion for filtering the geometry. For a */
-    /* performace consideration, It is perferable to use *MBRIntersect*     */
-    if( m_poFilterGeom != NULL && osGeomColumn.size())
-    { 
-        osWHERE.Printf( "WHERE INTERSECTS(%s, GEOMETRYFROMWKB( ~V , %d)) = 1",
-                        osGeomColumn.c_str(),
-                        nSRSId);
-    }
-
-    /* -------------------------------------------------------------------- */
-    /*              Attribute Filter										*/
-    /* -------------------------------------------------------------------- */
-    if( osQuery.size() > 0 )
-    {
-        if( osWHERE.size() == 0 )
-            osWHERE = "WHERE " + osQuery;
-        else
-            osWHERE += " AND " + osQuery;
-    }
-}
-
-/************************************************************************/
 /*                      BuildFullQueryStatement()                       */
 /************************************************************************/
 
@@ -339,7 +288,7 @@ void OGRIngresTableLayer::BuildFullQueryStatement()
 {
     char *pszFields = BuildFields();
 
-    osQueryStatement.Printf( "SELECT %s FROM %s %s", 
+    osQueryStatement.Printf( "SELECT %s FROM %s WHERE %s", 
                              pszFields, poFeatureDefn->GetName(), 
                              osWHERE.c_str() );
     
@@ -413,25 +362,6 @@ char *OGRIngresTableLayer::BuildFields()
     CPLAssert( (int) strlen(pszFieldList) < nSize );
 
     return pszFieldList;
-}
-
-/************************************************************************/
-/*                         SetAttributeFilter()                         */
-/************************************************************************/
-
-OGRErr OGRIngresTableLayer::SetAttributeFilter( const char *pszQuery )
-
-{
-    osQuery = "";
-
-    if( pszQuery != NULL )
-        osQuery = pszQuery;
-
-    BuildWhere();
-
-    ResetReading();
-
-    return OGRERR_NONE;
 }
 
 /************************************************************************/
@@ -1276,14 +1206,7 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
         /* Bind Geometry */
         if (m_poFilterGeom)
         {        
-            GByte * pabyWKB = NULL;
-            int nSize = m_poFilterGeom->WkbSize();
-            pabyWKB = (GByte *) CPLMalloc(nSize);
-
-            m_poFilterGeom->exportToWkb(wkbNDR, pabyWKB);
-
-            oStmt.addInputParameter( IIAPI_LBYTE_TYPE, nSize, pabyWKB );
-            CPLFree(pabyWKB);
+            BindQueryGeometry(&oStmt);
         }
     }
     else
