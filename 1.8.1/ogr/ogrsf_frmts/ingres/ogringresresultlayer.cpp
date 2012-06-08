@@ -88,7 +88,7 @@ OGRErr OGRIngresResultLayer::ParseSQLStmt(OGRIngresSelectStmt& oSelectStmt,
     /* 																*/
     /* -------------------------------------------------------------------- */
     char *pszSQL = CPLStrdup(pszRawSQL); 
-    pszSQL = strlwr(pszSQL);
+    pszSQL = CPLStrlwr(pszSQL);
     char *pStart = pszSQL; 
     char *pEnd = pszSQL;
     char *pCursor = 0;
