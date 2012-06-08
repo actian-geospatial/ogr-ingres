@@ -1223,7 +1223,8 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
         {
             osSqlCmd.Printf("SELECT INT4(num_rows) FROM iitables "
                 "WHERE TABLE_NAME=LOWERCASE('%s') AND "
-                "TABLE_OWNER=(SELECT DBMSINFO('username'))");
+                "TABLE_OWNER=(SELECT DBMSINFO('username'))",
+		poFeatureDefn->GetName());
         }        
     }
 
