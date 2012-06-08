@@ -288,10 +288,18 @@ void OGRIngresTableLayer::BuildFullQueryStatement()
 {
     char *pszFields = BuildFields();
 
-    osQueryStatement.Printf( "SELECT %s FROM %s WHERE %s", 
+    if( osWHERE.size() ) 
+    {
+         osQueryStatement.Printf( "SELECT %s FROM %s WHERE %s", 
                              pszFields, poFeatureDefn->GetName(), 
                              osWHERE.c_str() );
-    
+    }
+    else
+    {
+         osQueryStatement.Printf( "SELECT %s FROM %s",
+                             pszFields, poFeatureDefn->GetName(),
+                             osWHERE.c_str() );
+    } 
     CPLFree( pszFields );
 }
 
@@ -1200,7 +1208,7 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
     /* -------------------------------------------------------------------- */
     if (osWHERE.size())
     {
-        osSqlCmd.Printf("SELECT INT4(COUNT(*)) FROM %s %s",
+        osSqlCmd.Printf("SELECT INT4(COUNT(*)) FROM %s WHERE %s",
             poFeatureDefn->GetName(), osWHERE.c_str());
 
         /* Bind Geometry */
