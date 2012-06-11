@@ -78,16 +78,16 @@ IIAPI_SetConnParam(II_PTR *connHandle,
 /*                       IIAPI_CommitTransaction                        */
 /************************************************************************/
 static IIAPI_STATUS
-IIAPI_CommitTransaction(II_PTR *hConnHandle)
+IIAPI_CommitTransaction(II_PTR *hTransHandle)
 {
-    CPLAssert(hConnHandle);
+    CPLAssert(hTransHandle);
 
     IIAPI_COMMITPARM commitParm;
     IIAPI_WAITPARM	waitParm = { -1 };
 
     commitParm.cm_genParm.gp_callback = NULL;
     commitParm.cm_genParm.gp_closure = NULL;
-    commitParm.cm_tranHandle = *hConnHandle;
+    commitParm.cm_tranHandle = *hTransHandle;
 
     IIapi_commit( &commitParm );
 
@@ -101,7 +101,7 @@ IIAPI_CommitTransaction(II_PTR *hConnHandle)
         return IIAPI_ST_FAILURE;
     }
 
-    *hConnHandle = NULL;
+    *hTransHandle = NULL;
 
     return IIAPI_ST_SUCCESS;
 }
@@ -110,14 +110,14 @@ IIAPI_CommitTransaction(II_PTR *hConnHandle)
 /*                       IIAPI_RollbackTransaction                      */
 /************************************************************************/
 static IIAPI_STATUS
-IIAPI_RollbackTransaction(II_PTR *hConnHandle)
+IIAPI_RollbackTransaction(II_PTR *hTransHandle)
 {
-    CPLAssert(hConnHandle);
+    CPLAssert(hTransHandle);
 
     IIAPI_ROLLBACKPARM rollbacParm;
     IIAPI_WAITPARM waitParm = { -1 };
 
-    rollbacParm.rb_tranHandle = *hConnHandle;
+    rollbacParm.rb_tranHandle = *hTransHandle;
     rollbacParm.rb_savePointHandle = NULL;
     rollbacParm.rb_genParm.gp_callback = NULL;
     rollbacParm.rb_genParm.gp_closure = NULL;
@@ -133,7 +133,7 @@ IIAPI_RollbackTransaction(II_PTR *hConnHandle)
             "Failed to rollback transaction." );
         return IIAPI_ST_FAILURE;
     }
-    *hConnHandle = NULL;
+    *hTransHandle = NULL;
 
     return IIAPI_ST_SUCCESS;
 }
@@ -203,7 +203,7 @@ OGRIngresDataSource::~OGRIngresDataSource()
     CPLFree( papoLayers );
 
     /* Commit transaction if we have */
-    if (oTransInfo.GetConnHandle())
+    if (oTransInfo.GetTransHandle())
     {
         CommitTransaction();
     }
@@ -395,6 +395,8 @@ int OGRIngresDataSource::Open( const char *pszFullName,
                                     "Failed to connect to Ingres database." );
         return FALSE;
     }
+
+    oTransInfo.SetConnHandle(hConn);
 
     pszName = CPLStrdup( pszFullName );
     
@@ -1237,19 +1239,20 @@ OGRErr  OGRIngresDataSource::StartTransaction()
 /************************************************************************/
 OGRErr  OGRIngresDataSource::CommitTransaction()
 {
-    II_PTR hConn = oTransInfo.GetConnHandle();
+    II_PTR hTransaction = oTransInfo.GetTransHandle();
     OGRErr rtn = OGRERR_NONE;
 
-    if (hConn)
+    if (hTransaction == NULL)
     {
         /* do not have any transaction */
         return OGRERR_NONE;
     }
     
-    rtn = ( IIAPI_CommitTransaction(&hConn) == IIAPI_ST_SUCCESS ? OGRERR_NONE : OGRERR_FAILURE);
+    rtn = ( IIAPI_CommitTransaction(&hTransaction) == IIAPI_ST_SUCCESS ? 
+        OGRERR_NONE : OGRERR_FAILURE);
     if (rtn == OGRERR_NONE)
     {
-        oTransInfo.SetConnHandle(NULL);
+        oTransInfo.SetTransHandle(hTransaction);
     }
     
     return rtn;
@@ -1260,19 +1263,20 @@ OGRErr  OGRIngresDataSource::CommitTransaction()
 /************************************************************************/
 OGRErr  OGRIngresDataSource::RollbackTransaction()
 {
-    II_PTR hConn = oTransInfo.GetConnHandle();
+    II_PTR hTransaction = oTransInfo.GetTransHandle();
     OGRErr rtn = OGRERR_NONE;
 
-    if (hConn)
+    if (hTransaction == NULL)
     {
         /* do not have any transaction */
         return OGRERR_NONE;
     }
 
-    rtn = ( IIAPI_RollbackTransaction(&hConn) == IIAPI_ST_SUCCESS ? OGRERR_NONE : OGRERR_FAILURE);
+    rtn = ( IIAPI_RollbackTransaction(&hTransaction) == IIAPI_ST_SUCCESS ?
+        OGRERR_NONE : OGRERR_FAILURE);
     if (rtn == OGRERR_NONE)
     {
-        oTransInfo.SetConnHandle(hConn);
+        oTransInfo.SetTransHandle(hTransaction);
     }
 
     return rtn;

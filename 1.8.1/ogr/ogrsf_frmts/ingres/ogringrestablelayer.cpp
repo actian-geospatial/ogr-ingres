@@ -1208,7 +1208,7 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
     /* -------------------------------------------------------------------- */
     if (osWHERE.size())
     {
-        osSqlCmd.Printf("SELECT INT4(COUNT(*)) FROM %s %s",
+        osSqlCmd.Printf("SELECT INT4(COUNT(*)) FROM %s WHERE %s",
             poFeatureDefn->GetName(), osWHERE.c_str());
 
         /* Bind Geometry */
@@ -1231,7 +1231,8 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
         {
             osSqlCmd.Printf("SELECT INT4(num_rows) FROM iitables "
                 "WHERE TABLE_NAME=LOWERCASE('%s') AND "
-                "TABLE_OWNER=(SELECT DBMSINFO('username'))");
+                "TABLE_OWNER=(SELECT DBMSINFO('username'))",
+		        poFeatureDefn->GetName());
         }        
     }
 
@@ -1285,6 +1286,18 @@ OGRErr OGRIngresTableLayer::GetExtent(OGREnvelope *psExtent, int bForce )
         osGeomColumn.c_str(), 
         GetLayerDefn()->GetName());
     CPLDebug("Ingres", osCommand.c_str());
+
+    if (osWHERE.size())
+    {
+        osCommand += " WHERE ";
+        osCommand += osWHERE;
+
+        /* Bind Geometry */
+        if (m_poFilterGeom)
+        {        
+            BindQueryGeometry(&oStmt);
+        }
+    }
 
     /* -------------------------------------------------------------------- */
     /*  Execute SQL and get the result  									*/

@@ -88,7 +88,7 @@ OGRErr OGRIngresResultLayer::ParseSQLStmt(OGRIngresSelectStmt& oSelectStmt,
     /* 																*/
     /* -------------------------------------------------------------------- */
     char *pszSQL = CPLStrdup(pszRawSQL); 
-    pszSQL = strlwr(pszSQL);
+    pszSQL = CPLStrlwr(pszSQL);
     char *pStart = pszSQL; 
     char *pEnd = pszSQL;
     char *pCursor = 0;
@@ -333,6 +333,13 @@ OGRFeatureDefn *OGRIngresResultLayer::ReadResultDefinition()
           case IIAPI_INT_TYPE:
             oField.SetType( OFTInteger );
             poDefn->AddFieldDefn( &oField );
+
+            // if osFIDColumn is not defined, we have to use the first interger
+            // column. better way?
+            if (osFIDColumn.size() == 0)
+            {
+                osFIDColumn = psFDesc->ds_columnName;
+            }
             break;
 
           case IIAPI_FLT_TYPE:
@@ -416,13 +423,29 @@ void OGRIngresResultLayer::BuildFullQueryStatement()
 
 {
     osQueryStatement = pszRawStatement;
+    OGRIngresSelectStmt oSelectStmt;
+
+    if ( ParseSQLStmt(oSelectStmt, pszRawStatement) != OGRERR_NONE)
+    {
+        CPLError(CE_Failure, CPLE_AppDefined, "Failed to parse sql: %s",
+            pszRawStatement);
+        return ;
+    }
 
     /* -------------------------------------------------------------------- */
     /* Other query filter													*/
     /* -------------------------------------------------------------------- */
     if (osWHERE.size())
     {
-        osQueryStatement += " AND ";
+        if (oSelectStmt.osWhereClause.size())
+        {
+            osQueryStatement += " AND ";
+        }
+        else
+        {
+            osQueryStatement += " WHERE ";
+        }
+
         osQueryStatement += osWHERE;
     }
 }
@@ -462,17 +485,24 @@ int OGRIngresResultLayer::GetFeatureCount( int bForce )
 
     if (oSelectStmt.osWhereClause.size())
     {
-        osSqlCmd += " AND ";
+        osSqlCmd += " WHERE ";
         osSqlCmd += oSelectStmt.osWhereClause;
-    }
-    
+    }    
 
     /* -------------------------------------------------------------------- */
     /* Other query filter													*/
     /* -------------------------------------------------------------------- */
     if (osWHERE.size())
     {
-        osSqlCmd += " AND ";
+        if (oSelectStmt.osWhereClause.size())
+        {
+            osSqlCmd += " AND ";
+        }
+        else
+        {
+            osSqlCmd += " WHERE ";
+        }
+
         osSqlCmd += osWHERE;
     }
 
@@ -481,6 +511,8 @@ int OGRIngresResultLayer::GetFeatureCount( int bForce )
         OGRIngresLayer::BindQueryGeometry(&oStmt);
     }
     
+    CPLDebug("Ingres", osSqlCmd.c_str());
+
     if (!oStmt.ExecuteSQL(osSqlCmd.c_str()))
     {
         return OGRIngresLayer::GetFeatureCount( bForce );
