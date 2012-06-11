@@ -102,7 +102,7 @@ OGRFeatureDefn *OGRIngresTableLayer::ReadTableDefinition( const char *pszTable )
 /*      Fire off commands to get back the schema of the table.          */
 /* -------------------------------------------------------------------- */
     CPLString osCommand;
-    OGRIngresStatement oStatement( poDS->GetConn() );
+    OGRIngresStatement oStatement( poDS->GetTransaction() );
 
     osCommand.Printf( "select column_name, column_datatype, column_length, "
                       "column_scale, column_ingdatatype, "
@@ -288,10 +288,18 @@ void OGRIngresTableLayer::BuildFullQueryStatement()
 {
     char *pszFields = BuildFields();
 
-    osQueryStatement.Printf( "SELECT %s FROM %s WHERE %s", 
-                             pszFields, poFeatureDefn->GetName(), 
-                             osWHERE.c_str() );
-    
+    if (osWHERE.size())
+    {    
+        osQueryStatement.Printf( "SELECT %s FROM %s WHERE %s", 
+            pszFields, poFeatureDefn->GetName(), 
+            osWHERE.c_str() );
+    }
+    else
+    {
+        osQueryStatement.Printf( "SELECT %s FROM %s ", 
+            pszFields, poFeatureDefn->GetName());
+    }
+
     CPLFree( pszFields );
 }
 
@@ -453,7 +461,7 @@ OGRErr OGRIngresTableLayer::DeleteFeature( long nFID )
 /*      Execute the delete.                                             */
 /* -------------------------------------------------------------------- */
     poDS->EstablishActiveLayer( NULL );
-    OGRIngresStatement oStmt( poDS->GetConn() );
+    OGRIngresStatement oStmt( poDS->GetTransaction() );
     
     if( !oStmt.ExecuteSQL( osCommand ) )
         return OGRERR_FAILURE;
@@ -980,7 +988,7 @@ OGRErr OGRIngresTableLayer::CreateFeature( OGRFeature *poFeature )
 /*      Execute it.                                                     */
 /* -------------------------------------------------------------------- */
     poDS->EstablishActiveLayer( NULL );
-    OGRIngresStatement oStmt( poDS->GetConn() );
+    OGRIngresStatement oStmt( poDS->GetTransaction() );
 
     oStmt.bDebug = FALSE; 
 
@@ -1022,7 +1030,7 @@ OGRErr OGRIngresTableLayer::CreateField( OGRFieldDefn *poFieldIn,
     poDS->EstablishActiveLayer( NULL );
 
     CPLString           osCommand;
-    OGRIngresStatement  oStatement( poDS->GetConn() );
+    OGRIngresStatement  oStatement( poDS->GetTransaction() );
     char                szFieldType[256];
     OGRFieldDefn        oField( poFieldIn );
 
@@ -1137,7 +1145,7 @@ OGRFeature *OGRIngresTableLayer::GetFeature( long nFeatureId )
 /* -------------------------------------------------------------------- */
     char        *pszFieldList = BuildFields();
     CPLString   osSqlCmd;
-    OGRIngresStatement oStmt(poDS->GetConn());
+    OGRIngresStatement oStmt(poDS->GetTransaction());
 
     CPLAssert(pszFieldList);
     osSqlCmd.Printf("SELECT %s FROM %s WHERE %s = %ld",
@@ -1191,7 +1199,7 @@ int OGRIngresTableLayer::GetFeatureCount( int bForce )
 
 {
     CPLString osSqlCmd;
-    OGRIngresStatement oStmt( poDS->GetConn() );
+    OGRIngresStatement oStmt( poDS->GetTransaction() );
     int nCount = 0 ;
 
     poDS->EstablishActiveLayer( this );
@@ -1271,7 +1279,7 @@ OGRErr OGRIngresTableLayer::GetExtent(OGREnvelope *psExtent, int bForce )
 	OGREnvelope oEnv;
 	CPLString   osCommand;
 	GBool       bExtentSet = FALSE;
-    OGRIngresStatement oStmt(poDS->GetConn()); 
+    OGRIngresStatement oStmt(poDS->GetTransaction()); 
 
 	osCommand.Printf( "SELECT asbinary(extent(%s)) FROM %s", 
         osGeomColumn.c_str(), 

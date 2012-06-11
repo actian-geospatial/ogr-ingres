@@ -448,7 +448,7 @@ int OGRIngresResultLayer::GetFeatureCount( int bForce )
     // I wonder if we could do anything smart here...
     // ... not till Ingres grows up (HB)
     OGRIngresSelectStmt oSelectStmt;
-    OGRIngresStatement oStmt(poDS->GetConn());
+    OGRIngresStatement oStmt(poDS->GetTransaction());
 
     if ( ParseSQLStmt(oSelectStmt, pszRawStatement) != OGRERR_NONE)
     {
@@ -456,10 +456,16 @@ int OGRIngresResultLayer::GetFeatureCount( int bForce )
     }
     
     CPLString osSqlCmd;
-    osSqlCmd.Printf("SELECT INT4(COUNT(%s)) FROM %s WHERE %s",
+    osSqlCmd.Printf("SELECT INT4(COUNT(%s)) FROM %s ",
         CSLCount(oSelectStmt.papszFieldList) == 0 ? "*" : CSLGetField(oSelectStmt.papszFieldList, 0), 
-        oSelectStmt.osFromList.c_str(),
-        oSelectStmt.osWhereClause.c_str());
+        oSelectStmt.osFromList.c_str());
+
+    if (oSelectStmt.osWhereClause.size())
+    {
+        osSqlCmd += " AND ";
+        osSqlCmd += oSelectStmt.osWhereClause;
+    }
+    
 
     /* -------------------------------------------------------------------- */
     /* Other query filter													*/

@@ -747,7 +747,7 @@ OGRFeature *OGRIngresLayer::GetNextRawFeature()
 
         poDS->EstablishActiveLayer( this );
 
-        poResultSet = new OGRIngresStatement( poDS->GetConn() );
+        poResultSet = new OGRIngresStatement( poDS->GetTransaction() );
 
         /* -------------------------------------------------------------------- */
         /*              Binding Filter Geometry 								*/
@@ -864,7 +864,7 @@ int OGRIngresLayer::FetchSRSId(OGRFeatureDefn *poDefn)
     {
         char         szCommand[1024];
         char           **papszRow;
-        OGRIngresStatement oStatement(poDS->GetConn());
+        OGRIngresStatement oStatement(poDS->GetTransaction());
         
         sprintf( szCommand, 
                  "SELECT srid FROM geometry_columns "
@@ -902,4 +902,37 @@ OGRSpatialReference *OGRIngresLayer::GetSpatialRef()
     }
 
     return poSRS;
+}
+
+/************************************************************************/
+/*                    StartTransaction()                                */
+/************************************************************************/
+
+OGRErr      OGRIngresLayer::StartTransaction()
+
+{
+    CPLAssert(poDS);
+    return poDS->StartTransaction();
+}
+
+/************************************************************************/
+/*                   CommitTransaction()                                */
+/************************************************************************/
+
+OGRErr      OGRIngresLayer::CommitTransaction()
+
+{
+    CPLAssert(poDS);
+    return poDS->CommitTransaction();
+}
+
+/************************************************************************/
+/*                    RollbackTransaction()                             */
+/************************************************************************/
+
+OGRErr      OGRIngresLayer::RollbackTransaction()
+
+{
+    CPLAssert(poDS);
+    return poDS->RollbackTransaction();
 }
