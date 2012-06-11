@@ -36,6 +36,48 @@
 CPL_CVSID("$Id: ogringresdatasource.cpp 24341 2012-04-29 03:11:16Z warmerdam $");
 
 /************************************************************************/
+/*                      IIAPI_Intialize                                 */
+/************************************************************************/
+static void
+IIAPI_Intialize(II_PTR *hEnvHandle)
+{
+    CPLAssert(hEnvHandle);
+    
+    IIAPI_INITPARM  initParm;
+
+    initParm.in_version = IIAPI_VERSION; 
+    initParm.in_timeout = -1;
+    initParm.in_envHandle = *hEnvHandle;
+
+    IIapi_initialize( &initParm );
+
+    if (initParm.in_status == IIAPI_ST_SUCCESS)
+    {
+        *hEnvHandle = initParm.in_envHandle;
+    }
+}
+
+/************************************************************************/
+/*                       IIAPI_Terminate                                */
+/************************************************************************/
+static void
+IIAPI_Terminate( II_PTR *envHandle )
+{
+    IIAPI_RELENVPARM	relenv_parm;
+    IIAPI_TERMPARM		term_parm;
+
+    relenv_parm.re_status = IIAPI_ST_SUCCESS;
+
+    if (envHandle)
+    {
+        relenv_parm.re_envHandle = *envHandle;
+        IIapi_releaseEnv(&relenv_parm);
+    }
+
+    IIapi_terminate(&term_parm);
+}
+
+/************************************************************************/
 /*                            SetConnParam()                            */
 /*                                                                      */
 /*      Set Connection Parameters                                       */
@@ -141,7 +183,7 @@ IIAPI_RollbackTransaction(II_PTR *hTransHandle)
 /************************************************************************/
 /*                         IIAPI_Disconnect                             */
 /************************************************************************/
-IIAPI_STATUS
+static IIAPI_STATUS
 IIAPI_Disconnect( II_PTR	*connHandle)
 {
     IIAPI_DISCONNPARM	disconnParm;
@@ -212,6 +254,11 @@ OGRIngresDataSource::~OGRIngresDataSource()
     II_PTR hConnHandle = oTransInfo.GetConnHandle();
     IIAPI_Disconnect(&hConnHandle);
     oTransInfo.SetConnHandle(NULL);
+
+    /* Terminate the api */
+    II_PTR hEnvHandle = oTransInfo.GetEnvHandle();
+    IIAPI_Terminate(&hEnvHandle);
+    oTransInfo.SetEnvHandle(hEnvHandle);
 
     for( i = 0; i < nKnownSRID; i++ )
     {
@@ -317,16 +364,12 @@ int OGRIngresDataSource::Open( const char *pszFullName,
         strcpy(pszDBTarget, pszDBName);
     }
     
-/* -------------------------------------------------------------------- */
-/*      Initialize the Ingres API. Should we only do this once per      */
-/*      program run?  Really we should also try to terminate the api    */
-/*      on program exit.                                                */
-/* -------------------------------------------------------------------- */
-    IIAPI_INITPARM  initParm;
-
-    initParm.in_version = IIAPI_VERSION_1; 
-    initParm.in_timeout = -1;
-    IIapi_initialize( &initParm );
+    /* -------------------------------------------------------------------- */
+    /*  Intialize the API Environment               						*/
+    /* -------------------------------------------------------------------- */
+    II_PTR hEnvironment = oTransInfo.GetEnvHandle();
+    IIAPI_Intialize(&hEnvironment);
+    oTransInfo.SetEnvHandle(hEnvironment);
 
 /* -------------------------------------------------------------------- */
 /* check effective user and db password                                 */
