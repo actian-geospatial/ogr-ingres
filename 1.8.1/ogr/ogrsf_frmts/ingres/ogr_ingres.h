@@ -242,6 +242,7 @@ class OGRIngresResultLayer : public OGRIngresLayer
 
     virtual void        ResetReading();
     virtual int         GetFeatureCount( int );
+    virtual int         TestCapability( const char * pszCap );
 };
 
 /************************************************************************/

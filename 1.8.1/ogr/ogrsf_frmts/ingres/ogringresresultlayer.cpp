@@ -288,6 +288,35 @@ OGRErr OGRIngresResultLayer::ReparseQueryStatement()
 }
 
 /************************************************************************/
+/*                           TestCapability()                           */
+/************************************************************************/
+
+int OGRIngresResultLayer::TestCapability( const char * pszCap )
+
+{
+    if( EQUAL(pszCap,OLCRandomRead) )
+        return osFIDColumn.size() != 0;
+
+    else if( EQUAL(pszCap,OLCFastFeatureCount) )
+        return TRUE;
+
+    else if( EQUAL(pszCap,OLCSequentialWrite) )
+        return FALSE;
+
+    else if( EQUAL(pszCap,OLCCreateField) )
+        return FALSE;
+
+    else if( EQUAL(pszCap,OLCRandomWrite) )
+        return FALSE;
+
+    else if( EQUAL(pszCap,OLCDeleteFeature) )
+        return FALSE;
+
+    else 
+        return OGRIngresLayer::TestCapability( pszCap );
+}
+
+/************************************************************************/
 /*                        ReadResultDefinition()                        */
 /*                                                                      */
 /*      Build a schema from the current resultset.                      */

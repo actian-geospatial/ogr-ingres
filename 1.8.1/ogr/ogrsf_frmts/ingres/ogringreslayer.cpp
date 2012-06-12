@@ -804,13 +804,13 @@ int OGRIngresLayer::TestCapability( const char * pszCap )
         return FALSE;
 
     else if( EQUAL(pszCap,OLCFastFeatureCount) )
-        return FALSE;
+        return TRUE;
 
     else if( EQUAL(pszCap,OLCFastSpatialFilter) )
-        return FALSE;
+        return TRUE;
 
     else if( EQUAL(pszCap,OLCTransactions) )
-        return FALSE;
+        return TRUE;
 
     else if( EQUAL(pszCap,OLCFastGetExtent) )
         return FALSE;
