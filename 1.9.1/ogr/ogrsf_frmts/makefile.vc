@@ -10,7 +10,7 @@ DIRLIST		=	generic geojson shape ntf sdts tiger s57 dgn mitab gml \
 			$(ODBCDIR) $(SQLITE_DIR) $(MYSQL_DIR) $(ILI_DIR) \
 			$(SDE_DIR) $(IDB_DIR) $(NAS_DIR) $(DODSDIR) \
 			$(PCIDSK_DIR) $(LIBKMLDIR) $(WFSDIR) $(SOSIDIR) $(GFTDIR) \
-			$(COUCHDBDIR) $(FGDB_DIR) $(XLSDIR)
+			$(COUCHDBDIR) $(FGDB_DIR) $(XLSDIR) $(INGRESDIR)
 
 !INCLUDE $(GDAL_ROOT)\nmake.opt
 
@@ -41,6 +41,13 @@ SQLITE_OBJ =	sqlite\*.obj
 !IFDEF OCI_LIB
 OCIDIR	=	oci
 OCIOBJ =	oci\*.obj
+!ENDIF
+
+!IFDEF INGRES_HOME
+!IF "$(INGRES_PLUGIN)" != "YES"
+INGRESDIR	=	ingres
+INGRESOBJ =	ingres\*.obj
+!ENDIF
 !ENDIF
 
 !IFDEF FME_DIR
@@ -154,7 +161,7 @@ default:
 				$(FMEOBJ) $(OCIOBJ) $(PG_OBJ) $(MYSQL_OBJ) \
 				$(ILI_OBJ) $(DWG_OBJ) $(SDE_OBJ) $(FGDB_OBJ) $(ARCDRIVER_OBJ) $(IDB_OBJ) \
 				$(DODS_OBJ) $(NAS_OBJ) $(PCIDSKOBJ) $(LIBKMLOBJ) $(WFS_OBJ) \
-				$(SOSI_OBJ) $(GFT_OBJ) $(COUCHDB_OBJ) $(XLS_OBJ)
+				$(SOSI_OBJ) $(GFT_OBJ) $(COUCHDB_OBJ) $(XLS_OBJ) $(INGRESOBJ)
 	lib /out:ogrsf_frmts_sup.lib \
 				 ..\..\frmts\iso8211\*.obj \
 				 ..\..\frmts\sdts\sdtsattrreader.obj \
