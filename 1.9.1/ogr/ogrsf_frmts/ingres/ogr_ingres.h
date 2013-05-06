@@ -191,6 +191,8 @@ class OGRIngresTableLayer : public OGRIngresLayer
                                          int bUpdate, int nSRSId = -2 );
                         ~OGRIngresTableLayer();
 
+    OGRErr              SplitTableName(const char *pszName, CPLString& sTable, CPLString &sColumn);
+
     OGRErr              Initialize(const char* pszTableName);
     
     virtual OGRFeature *GetFeature( long nFeatureId );
@@ -309,6 +311,8 @@ class OGRIngresDataSource : public OGRDataSource
 
     int					bNewIngres; /* TRUE if new spatial library */
 
+    int                 bVW;      /* TRUE if it is a vectorwise, FALSE if Ingres database(default) */
+
   public:
                         OGRIngresDataSource();
                         ~OGRIngresDataSource();
@@ -356,6 +360,8 @@ class OGRIngresDataSource : public OGRDataSource
 
     void                EstablishActiveLayer( OGRIngresLayer * );
     int					IsNewIngres();
+
+    int                 IsVWDB() {return bVW;}
 };
 
 /************************************************************************/

@@ -226,6 +226,8 @@ OGRIngresDataSource::OGRIngresDataSource()
     panSRID = NULL;
     papoSRS = NULL;
     poActiveLayer = NULL;
+
+    bVW = FALSE; /* the default type is Ingres */
 }
 
 /************************************************************************/
@@ -467,22 +469,49 @@ int OGRIngresDataSource::Open( const char *pszFullName,
     	}
     }
 
+    /* -------------------------------------------------------------------- */
+    /*      Check if vw                                                     */
+    /* -------------------------------------------------------------------- */
+    const char *pszDBType = CSLFetchNameValue(papszOptions,"dbtype") ;
+    if (pszDBType && EQUAL(pszDBType, "VW"))
+    {
+      bVW = TRUE;
+    }
+
 /* -------------------------------------------------------------------- */
 /*      Get a list of available tables.                                 */
 /* -------------------------------------------------------------------- */
     if( papszTableNames == NULL )
     {
         OGRIngresStatement oStmt( GetTransaction() );
-        
-        if( oStmt.ExecuteSQL( "select table_name from iitables where system_use = 'U' and table_name not like 'iietab_%'" ) )
+
+        if (bVW == TRUE)
         {
-            char **papszFields;
-            while( (papszFields = oStmt.GetRow()) )
+            if( oStmt.ExecuteSQL( "select f_table_name+'.'+f_geometry_column from geometry_columns Union \
+                                  select table_name from iitables where system_use = 'U' and table_name not like 'iietab_%' and table_name not in (select f_table_name from geometry_columns)" ) )
             {
-                CPLString osTableName = papszFields[0];
-                osTableName.Trim();
-                papszTableNames = CSLAddString( papszTableNames, 
-                                                osTableName );
+                char **papszFields;
+                while( (papszFields = oStmt.GetRow()) )
+                {
+                    CPLString osTableName = papszFields[0];
+                    osTableName.Trim();
+                    papszTableNames = CSLAddString( papszTableNames, 
+                        osTableName );
+                }
+            }
+        }
+        else
+        {
+            if( oStmt.ExecuteSQL( "select table_name from iitables where system_use = 'U' and table_name not like 'iietab_%'" ) )
+            {
+                char **papszFields;
+                while( (papszFields = oStmt.GetRow()) )
+                {
+                    CPLString osTableName = papszFields[0];
+                    osTableName.Trim();
+                    papszTableNames = CSLAddString( papszTableNames, 
+                        osTableName );
+                }
             }
         }
     }
@@ -663,6 +692,12 @@ OGRSpatialReference *OGRIngresDataSource::FetchSRS( int nId )
     if(IsNewIngres() == FALSE)
         return NULL;
 
+    /*
+    **  VectorVise do not support spatial reference
+    */
+    if(IsVWDB() == TRUE)
+        return NULL;
+
 /* -------------------------------------------------------------------- */
 /*      First, we look through our SRID cache, is it there?             */
 /* -------------------------------------------------------------------- */
@@ -738,6 +773,14 @@ int OGRIngresDataSource::FetchSRSId( OGRSpatialReference * poSRS )
 
     if( poSRS == NULL )
         return -1;
+
+    /* -------------------------------------------------------------------- */
+    /*  VectorWise database does not support spatial reference.     		*/
+    /* -------------------------------------------------------------------- */    
+    if (IsVWDB() == TRUE)
+    {
+        return -1;
+    }
 
     /* -------------------------------------------------------------------- */
     /*  If it is a EPSG	Spatial Reference, search with special type			*/

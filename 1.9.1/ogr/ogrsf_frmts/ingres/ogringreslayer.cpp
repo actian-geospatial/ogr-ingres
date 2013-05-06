@@ -567,7 +567,17 @@ OGRFeature *OGRIngresLayer::RecordToFeature( char **papszRow )
         		unsigned char *pszWKB = (unsigned char *) papszRow[iField];
 
 //        		OGRGeometryFactory::createFromWkt(&pszWKT, NULL, &poGeometry);
-        		OGRGeometryFactory::createFromWkb(pszWKB, NULL, &poGeometry, -1);
+
+                if (poDS->IsVWDB())
+                {
+                    // VectorWise use wkt to create geometry
+                    char **pszWKT = (char **)&pszWKB;
+                    OGRGeometryFactory::createFromWkt(pszWKT, NULL, &poGeometry);
+                }
+                else
+                {
+        		    OGRGeometryFactory::createFromWkb(pszWKB, NULL, &poGeometry, -1);
+                }       
 
         		poFeature->SetGeometryDirectly(poGeometry);
         	}

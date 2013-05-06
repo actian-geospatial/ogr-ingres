@@ -87,6 +87,37 @@ OGRErr  OGRIngresTableLayer::Initialize(const char * pszTableName)
 }
 
 /************************************************************************/
+/*                        SplitTableName()                              */
+/*                                                                      */
+/*   Split a string into table name and column name.                    */
+/************************************************************************/
+OGRErr  OGRIngresTableLayer::SplitTableName(const char *pszName, 
+                                            CPLString& sTable, 
+                                            CPLString& sColumn)
+{
+    if (pszName == NULL)
+    {
+        return OGRERR_FAILURE;
+    }
+
+    CPLString sName(pszName);
+
+    unsigned found = sName.find(".");
+    if (found != std::string::npos)
+    {
+        sTable = sName.substr(0, found);
+        sColumn = sName.substr(found+1, sName.size()-found);
+    }
+    else
+    {
+        sTable = sName;
+        sColumn = "";
+    }
+
+    return OGRERR_NONE;
+}
+
+/************************************************************************/
 /*                        ReadTableDefinition()                         */
 /*                                                                      */
 /*      Build a schema from the named table.  Done by querying the      */
@@ -104,11 +135,41 @@ OGRFeatureDefn *OGRIngresTableLayer::ReadTableDefinition( const char *pszTable )
     CPLString osCommand;
     OGRIngresStatement oStatement( poDS->GetTransaction() );
 
-    osCommand.Printf( "select column_name, column_datatype, column_length, "
-                      "column_scale, column_ingdatatype, "
-                      "column_internal_datatype "
-                      "from iicolumns where table_name = '%s'", 
-                      pszTable );
+
+    /* -------------------------------------------------------------------- */
+    /*      Do we have table_name and column name?          */
+    /* -------------------------------------------------------------------- */
+    CPLString osTable;
+    CPLString osGeometryColumn;
+
+    /* split name and column */
+    SplitTableName(pszTable, osTable, osGeometryColumn);
+
+    if (poDS->IsVWDB() && osGeometryColumn.size() >0)
+    {
+        osCommand.Printf( "select c.column_name, c.column_datatype, c.column_length, "
+            "c.column_scale, c.column_ingdatatype, "
+            "char(g.geometry_type) "
+            "from iicolumns c, geometry_columns g where c.table_name = '%s' "
+            " and c.table_name = g.f_table_name and g.f_geometry_column='%s' and c.column_name=g.f_geometry_column"
+            " UNION "
+            "select column_name, column_datatype, column_length, "
+            "column_scale, column_ingdatatype, "
+            "column_internal_datatype "
+            "from iicolumns where table_name = '%s' and column_name <> '%s'", 
+            osTable.c_str(),
+            osGeometryColumn.c_str(),
+            osTable.c_str(),
+            osGeometryColumn.c_str());
+    }
+    else
+    {
+        osCommand.Printf( "select column_name, column_datatype, column_length, "
+            "column_scale, column_ingdatatype, "
+            "column_internal_datatype "
+            "from iicolumns where table_name = '%s'", 
+            pszTable );
+    }
 
     if( !oStatement.ExecuteSQL( osCommand ) )
     {
@@ -118,7 +179,7 @@ OGRFeatureDefn *OGRIngresTableLayer::ReadTableDefinition( const char *pszTable )
 /* -------------------------------------------------------------------- */
 /*      Parse the returned table information.                           */
 /* -------------------------------------------------------------------- */
-    OGRFeatureDefn *poDefn = new OGRFeatureDefn( pszTable );
+    OGRFeatureDefn *poDefn = new OGRFeatureDefn( osTable.c_str() );
     char           **papszRow;
 
     poDefn->Reference();
@@ -272,9 +333,16 @@ OGRFeatureDefn *OGRIngresTableLayer::ReadTableDefinition( const char *pszTable )
     oStatement.Close();
 
     // Fetch the SRID for this table now
-    // But only if it's the new Ingres Geospatial
-    if(poDS->IsNewIngres() == TRUE)
+    // But only if it's the new Ingres Geospatial and not in VectorWise
+    if(poDS->IsNewIngres() == TRUE
+        && poDS->IsVWDB() == FALSE)
+    {
         nSRSId = FetchSRSId(poDefn);
+    }
+    else
+    {
+        nSRSId = -1;
+    }
 
     return poDefn;
 }
@@ -347,8 +415,19 @@ char *OGRIngresTableLayer::BuildFields()
 
         if( poDS->IsNewIngres() )
         {
-			sprintf( pszFieldList+strlen(pszFieldList),
+            if (poDS->IsVWDB())
+            {
+                // VW database does not support geometry column, so we 
+                // have to select directly. Change the function if necessary.
+                //
+                sprintf( pszFieldList+strlen(pszFieldList),
+                    "%s %s", osGeomColumn.c_str(), osGeomColumn.c_str() );
+            }
+            else
+            {
+			    sprintf( pszFieldList+strlen(pszFieldList),
 					 "ASBINARY(%s) %s", osGeomColumn.c_str(), osGeomColumn.c_str() );
+            }
         }
         else
         {
